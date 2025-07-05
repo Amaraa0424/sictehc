@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { usePathname } from "next/navigation"
 import { 
   Home, 
@@ -29,6 +29,9 @@ export default function MobileNav({ user }: MobileNavProps) {
   const [showMessagesModal, setShowMessagesModal] = useState(false)
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [unreadMessages, setUnreadMessages] = useState(0)
+  const profileBtnRef = useRef<HTMLButtonElement>(null)
+  const notificationsBtnRef = useRef<HTMLButtonElement>(null)
+  const messagesBtnRef = useRef<HTMLButtonElement>(null)
 
   const fetchUnreadCounts = async () => {
     if (!user) return
@@ -227,14 +230,17 @@ export default function MobileNav({ user }: MobileNavProps) {
       <ProfileModal 
         isOpen={showProfileModal} 
         onClose={() => setShowProfileModal(false)} 
+        buttonRef={profileBtnRef}
       />
       <NotificationsModal 
         isOpen={showNotificationsModal} 
         onClose={() => setShowNotificationsModal(false)} 
+        buttonRef={notificationsBtnRef}
       />
       <MessagesModal 
         isOpen={showMessagesModal} 
         onClose={() => setShowMessagesModal(false)} 
+        buttonRef={messagesBtnRef}
       />
     </>
   )

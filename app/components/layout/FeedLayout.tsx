@@ -2,7 +2,7 @@
 
 import { ReactNode, useState, useRef } from "react"
 import MobileNav from "../navigation/MobileNav"
-import ProfileModal from "../navigation/ProfileModal"
+import UserDropdown from "../navigation/UserModal"
 import NotificationsModal from "../navigation/NotificationsModal"
 import MessagesModal from "../navigation/MessagesModal"
 
@@ -114,7 +114,7 @@ export default function FeedLayout({ children, user }: FeedLayoutProps) {
                   </span>
                   <span className="hidden sm:block text-sm">▼</span>
                 </button>
-                <ProfileModal isOpen={isProfileOpen} onClose={() => setProfileOpen(false)} buttonRef={profileBtnRef} />
+                <UserDropdown isOpen={isProfileOpen} onClose={() => setProfileOpen(false)} buttonRef={profileBtnRef} />
               </div>
             </div>
           </div>

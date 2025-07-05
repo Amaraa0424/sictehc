@@ -14,7 +14,7 @@ import Link from "next/link"
 interface UserDropdownProps {
   isOpen: boolean
   onClose: () => void
-  buttonRef: React.RefObject<HTMLButtonElement | null>
+  buttonRef: React.RefObject<HTMLButtonElement>
 }
 
 export default function UserDropdown({ isOpen, onClose, buttonRef }: UserDropdownProps) {
@@ -76,10 +76,12 @@ export default function UserDropdown({ isOpen, onClose, buttonRef }: UserDropdow
         </div>
       </div>
       <div className="flex flex-col gap-1 py-2">
-        <Link href={`/users/${user.username}`} legacyBehavior>
-          <a className="w-full flex items-center gap-2 px-4 py-2 rounded-lg bg-transparent hover:bg-zinc-800 text-zinc-100 text-left" role="menuitem">
-            <UserIcon className="h-4 w-4" /> Profile
-          </a>
+        <Link
+          href={`/users/${user.username}`}
+          className="w-full flex items-center gap-2 px-4 py-2 rounded-lg bg-transparent hover:bg-zinc-800 text-zinc-100 text-left"
+          role="menuitem"
+        >
+          <UserIcon className="h-4 w-4" /> Profile
         </Link>
         <button className="w-full flex items-center gap-2 px-4 py-2 rounded-lg bg-transparent hover:bg-zinc-800 text-zinc-100 text-left" role="menuitem">
           <Settings className="h-4 w-4" /> Settings

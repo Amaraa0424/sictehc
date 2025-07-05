@@ -9,7 +9,7 @@ const protectedRoutes = [
   "/notifications",
   "/messages",
   "/saved",
-  "/profile",
+  "/users",
   "/posts",
   "/clubs",
 ]

@@ -87,7 +87,7 @@ export async function updateProfile(formData: FormData) {
       },
     })
 
-    revalidatePath("/profile")
+    revalidatePath("/users")
     revalidatePath(`/users/${updatedUser.username}`)
     return { success: true, data: updatedUser }
   } catch (error) {
@@ -202,7 +202,7 @@ export async function updateProfilePic(formData: FormData) {
       },
     })
 
-    revalidatePath("/profile")
+    revalidatePath("/users")
     revalidatePath(`/users/${user.username}`)
     return { success: true, data: updatedUser }
   } catch (error) {
@@ -232,7 +232,7 @@ export async function addUserTag(formData: FormData) {
       },
     })
 
-    revalidatePath("/profile")
+    revalidatePath("/users")
     revalidatePath(`/users/${user.username}`)
     return { success: true }
   } catch (error) {
@@ -268,7 +268,7 @@ export async function removeUserTag(formData: FormData) {
       },
     })
 
-    revalidatePath("/profile")
+    revalidatePath("/users")
     revalidatePath(`/users/${user.username}`)
     return { success: true }
   } catch (error) {
@@ -292,6 +292,7 @@ export async function getUserProfile(username: string) {
         university: true,
         profilePic: true,
         isPrivate: true,
+        isVerified: true,
         createdAt: true,
         _count: {
           select: {
@@ -491,9 +492,9 @@ export async function searchUsers(query: string, options: {
 
     const where = {
       OR: [
-        { name: { contains: query, mode: "insensitive" } },
-        { username: { contains: query, mode: "insensitive" } },
-        { bio: { contains: query, mode: "insensitive" } },
+        { name: { contains: query, mode: "insensitive" as const } },
+        { username: { contains: query, mode: "insensitive" as const } },
+        { bio: { contains: query, mode: "insensitive" as const } },
       ],
     }
 
