@@ -22,7 +22,7 @@ export async function createLikeNotification(
         type: "LIKE",
         postId,
         fromUserId: likerId,
-        toUserId: postAuthorId,
+        userId: postAuthorId,
       },
     })
 
@@ -35,7 +35,7 @@ export async function createLikeNotification(
         type: "LIKE",
         postId,
         fromUserId: likerId,
-        toUserId: postAuthorId,
+        userId: postAuthorId,
       },
     })
 
@@ -65,7 +65,7 @@ export async function createCommentNotification(
         type: "COMMENT",
         postId,
         fromUserId: commenterId,
-        toUserId: postAuthorId,
+        userId: postAuthorId,
       },
     })
 
@@ -78,7 +78,7 @@ export async function createCommentNotification(
         type: "COMMENT",
         postId,
         fromUserId: commenterId,
-        toUserId: postAuthorId,
+        userId: postAuthorId,
       },
     })
 
@@ -108,7 +108,7 @@ export async function getNotifications({
 
     const [notifications, total] = await Promise.all([
       prisma.notification.findMany({
-        where: { toUserId: user.id },
+        where: { userId: user.id },
         include: {
           fromUser: {
             select: {
@@ -130,7 +130,7 @@ export async function getNotifications({
         skip,
         take: limit,
       }),
-      prisma.notification.count({ where: { toUserId: user.id } }),
+      prisma.notification.count({ where: { userId: user.id } }),
     ])
 
     const hasNextPage = skip + limit < total
@@ -167,7 +167,7 @@ export async function markNotificationAsRead(notificationId: string) {
     await prisma.notification.update({
       where: {
         id: notificationId,
-        toUserId: user.id, // Ensure user owns the notification
+        userId: user.id, // Ensure user owns the notification
       },
       data: { isRead: true },
     })
@@ -190,7 +190,7 @@ export async function markAllNotificationsAsRead() {
 
     await prisma.notification.updateMany({
       where: {
-        toUserId: user.id,
+        userId: user.id,
         isRead: false,
       },
       data: { isRead: true },
@@ -214,7 +214,7 @@ export async function getUnreadNotificationCount() {
 
     const count = await prisma.notification.count({
       where: {
-        toUserId: user.id,
+        userId: user.id,
         isRead: false,
       },
     })
