@@ -1,0 +1,384 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication and profiles
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  username      String    @unique
+  password      String    // Hashed password
+  program       String?
+  year          Int?      // Academic year (1-4 for undergrad, 5+ for grad)
+  university    String?
+  bio           String?   @db.Text
+  profilePic    String?   // URL to profile picture in Supabase Storage
+  isVerified    Boolean   @default(false)
+  isPrivate     Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  posts         Post[]
+  comments      Comment[]
+  likes         Like[]
+  reposts       Repost[]
+  followers     Follow[]  @relation("UserFollowers")
+  following     Follow[]  @relation("UserFollowing")
+  
+  // Club relations
+  clubMemberships ClubMember[]
+  clubRoles     ClubRole[]
+  
+  // Chat relations
+  sentMessages     Message[]  @relation("MessageSender")
+  chatParticipants ChatParticipant[]
+  
+  // Notification relations
+  notifications Notification[]
+  
+  // Search and discovery
+  userTags      UserTag[]
+  savedPosts    SavedPost[]
+
+  @@map("users")
+}
+
+// Post model for academic content
+model Post {
+  id          String    @id @default(cuid())
+  authorId    String
+  content     String    @db.Text
+  title       String?   // For research papers
+  abstract    String?   @db.Text // For research papers
+  mediaUrls   String[]  // Array of media URLs (PDFs, images, videos)
+  mediaType   MediaType @default(TEXT)
+  tags        String[]  // Array of tags for search
+  isPublished Boolean   @default(true)
+  visibility  Visibility @default(PUBLIC)
+  viewCount   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  author      User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  comments    Comment[]
+  likes       Like[]
+  reposts     Repost[]
+  savedBy     SavedPost[]
+
+  @@map("posts")
+}
+
+// Comment model
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String
+  authorId  String
+  content   String   @db.Text
+  parentId  String?  // For nested comments
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   Comment[] @relation("CommentReplies")
+  likes     CommentLike[]
+
+  @@map("comments")
+}
+
+// Like model for posts
+model Like {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  // Relations
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@map("likes")
+}
+
+// Comment like model
+model CommentLike {
+  id        String   @id @default(cuid())
+  commentId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  // Relations
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+  @@map("comment_likes")
+}
+
+// Repost model
+model Repost {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  // Relations
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@map("reposts")
+}
+
+// Follow model for user relationships
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  // Relations
+  follower    User     @relation("UserFollowers", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("UserFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@map("follows")
+}
+
+// Club model for academic clubs
+model Club {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @db.Text
+  category    String   // Engineering, Arts, Science, etc.
+  logo        String?  // URL to club logo
+  banner      String?  // URL to club banner
+  isActive    Boolean  @default(true)
+  isPrivate   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  members     ClubMember[]
+  roles       ClubRole[]
+  posts       ClubPost[]
+  events      ClubEvent[]
+
+  @@map("clubs")
+}
+
+// Club member model
+model ClubMember {
+  id        String   @id @default(cuid())
+  clubId    String
+  userId    String
+  role      ClubRoleType @default(MEMBER)
+  joinedAt  DateTime @default(now())
+
+  // Relations
+  club      Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, userId])
+  @@map("club_members")
+}
+
+// Club role model for admin roles
+model ClubRole {
+  id        String   @id @default(cuid())
+  clubId    String
+  userId    String
+  role      ClubRoleType
+  createdAt DateTime @default(now())
+
+  // Relations
+  club      Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, userId, role])
+  @@map("club_roles")
+}
+
+// Club post model
+model ClubPost {
+  id        String   @id @default(cuid())
+  clubId    String
+  authorId  String
+  title     String
+  content   String   @db.Text
+  mediaUrls String[]
+  isAnnouncement Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  club      Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@map("club_posts")
+}
+
+// Club event model
+model ClubEvent {
+  id          String   @id @default(cuid())
+  clubId      String
+  title       String
+  description String   @db.Text
+  startDate   DateTime
+  endDate     DateTime
+  location    String?
+  isOnline    Boolean  @default(false)
+  meetingUrl  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  club        Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@map("club_events")
+}
+
+// Chat model for 1-on-1 and group chats
+model Chat {
+  id          String   @id @default(cuid())
+  name        String?  // For group chats
+  isGroup     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  participants ChatParticipant[]
+  messages     Message[]
+
+  @@map("chats")
+}
+
+// Chat participant model
+model ChatParticipant {
+  id        String   @id @default(cuid())
+  chatId    String
+  userId    String
+  joinedAt  DateTime @default(now())
+  leftAt    DateTime?
+
+  // Relations
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, userId])
+  @@map("chat_participants")
+}
+
+// Message model for chat messages
+model Message {
+  id        String   @id @default(cuid())
+  chatId    String
+  senderId  String
+  content   String   @db.Text
+  mediaUrl  String?  // For file attachments
+  mediaType MediaType?
+  isRead    Boolean  @default(false)
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  // Relations
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender    User     @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+// Notification model
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  data      Json?            // Additional data for the notification
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  // Relations
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// User tag model for search and discovery
+model UserTag {
+  id        String   @id @default(cuid())
+  userId    String
+  tag       String
+  createdAt DateTime @default(now())
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tag])
+  @@map("user_tags")
+}
+
+// Saved post model
+model SavedPost {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@map("saved_posts")
+}
+
+// Enums
+enum MediaType {
+  TEXT
+  IMAGE
+  VIDEO
+  PDF
+  DOCUMENT
+}
+
+enum Visibility {
+  PUBLIC
+  PRIVATE
+  CLUB_ONLY
+}
+
+enum ClubRoleType {
+  PRESIDENT
+  SECRETARY
+  MEMBER
+}
+
+enum NotificationType {
+  LIKE
+  COMMENT
+  REPOST
+  FOLLOW
+  MESSAGE
+  CLUB_INVITE
+  CLUB_ANNOUNCEMENT
+  EVENT_REMINDER
+}

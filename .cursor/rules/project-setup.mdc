@@ -1,0 +1,245 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Note this full operation for this project and use it for further development.
+
+# UniConnect Server Actions Documentation
+
+## Overview
+This document outlines all server actions created for the UniConnect platform, their purposes, and usage patterns. The actions are built using Next.js Server Actions for optimal performance and progressive enhancement.
+
+## Architecture Principles
+- **Server Actions**: All mutations use Next.js Server Actions for reduced client-side JavaScript
+- **Zod Validation**: Comprehensive input validation with user-friendly error messages
+- **Authentication**: Every action checks user authentication via `getCurrentUser()`
+- **Authorization**: Role-based access control for sensitive operations
+- **Cache Management**: Strategic use of `revalidatePath()` for automatic cache invalidation
+- **Error Handling**: Graceful error handling with detailed logging
+
+---
+
+## �� Posts Operations
+
+### Core CRUD
+- **`createPost()`** - Create academic posts with content, media, tags, and visibility settings
+- **`updatePost()`** - Edit existing posts (author only)
+- **`deletePost()`** - Remove posts (author only)
+
+### Social Interactions
+- **`likePost()`** - Like a post (creates unique constraint, handles duplicates)
+- **`unlikePost()`** - Remove like from post
+- **`repost()`** - Repost content to user's feed
+- **`unrepost()`** - Remove repost
+- **`savePost()`** - Save post for later reading
+- **`unsavePost()`** - Remove from saved posts
+
+### Data Fetching
+- **`getPosts()`** - Fetch posts with pagination, filtering by user/tags/search
+- **`getPost()`** - Get single post with comments and view count increment
+
+### Purpose
+Posts are the core content type for academic sharing. Users can create research summaries, share papers, and engage through likes/reposts. Supports rich media (PDFs, images, videos) and tagging for discovery.
+
+---
+
+## 💬 Comments Operations
+
+### Core CRUD
+- **`createComment()`** - Add comments to posts with nested reply support
+- **`updateComment()`** - Edit comments (author only)
+- **`deleteComment()`** - Remove comments (author only)
+
+### Social Interactions
+- **`likeComment()`** - Like a comment
+- **`unlikeComment()`** - Remove comment like
+
+### Data Fetching
+- **`getComments()`** - Fetch comments for a post with pagination
+- **`getCommentReplies()`** - Get nested comment replies
+
+### Purpose
+Comments enable academic discussions on posts. Supports nested replies for threaded conversations. Like system encourages quality engagement.
+
+---
+
+## �� Users Operations
+
+### Profile Management
+- **`updateProfile()`** - Update user profile (name, username, bio, academic info)
+- **`updateProfilePic()`** - Change profile picture URL
+
+### Social Network
+- **`followUser()`** - Follow another user
+- **`unfollowUser()`** - Unfollow user
+- **`getFollowers()`** - Get user's followers list
+- **`getFollowing()`** - Get users that user follows
+
+### Discovery & Tags
+- **`addUserTag()`** - Add interest tag to profile
+- **`removeUserTag()`** - Remove interest tag
+- **`searchUsers()`** - Search users by name/username/bio
+
+### Data Fetching
+- **`getUserProfile()`** - Get user profile with stats
+- **`getUserPosts()`** - Get user's posts with pagination
+
+### Purpose
+User profiles showcase academic background and interests. Follow system enables content discovery. Tags help with search and recommendations.
+
+---
+
+## 🏛️ Clubs Operations
+
+### Club Management
+- **`createClub()`** - Create new academic club (creator becomes president)
+- **`updateClub()`** - Edit club details (president only)
+- **`deleteClub()`** - Delete club (president only)
+
+### Membership
+- **`joinClub()`** - Join a club as member
+- **`leaveClub()`** - Leave club (presidents cannot leave)
+
+### Club Content
+- **`createClubPost()`** - Create club-specific posts/announcements
+- **`createClubEvent()`** - Create club events (admins only)
+
+### Data Fetching
+- **`getClubs()`** - Browse clubs with category/search filtering
+- **`getClub()`** - Get single club with members/posts/events
+- **`getUserClubs()`** - Get user's club memberships
+
+### Purpose
+Clubs are mini-communities for academic collaboration. Support announcements, events, and member management. Role-based permissions (President, Secretary, Member).
+
+---
+
+## 🔐 Security & Authorization
+
+### Authentication Checks
+- Every action calls `getCurrentUser()` to verify authentication
+- Unauthorized requests return error responses
+
+### Authorization Patterns
+- **Ownership**: Users can only edit/delete their own content
+- **Membership**: Club actions require membership
+- **Role-based**: Club admins have elevated permissions
+- **Privacy**: Respects user privacy settings
+
+### Data Validation
+- **Zod Schemas**: All inputs validated with descriptive error messages
+- **SQL Injection**: Prisma ORM prevents injection attacks
+- **XSS Prevention**: Input sanitization and proper escaping
+
+---
+
+## 🚀 Performance Optimizations
+
+### Database Queries
+- **Selective Includes**: Only fetch needed relations
+- **Pagination**: All list operations support pagination
+- **Count Queries**: Parallel execution for pagination data
+- **Indexed Fields**: Proper use of unique constraints
+
+### Caching Strategy
+- **Path Revalidation**: `revalidatePath()` for affected routes
+- **Granular Updates**: Only invalidate relevant cache paths
+- **Optimistic Updates**: UI updates immediately, server validates
+
+### Error Handling
+- **Graceful Degradation**: Actions fail gracefully with user feedback
+- **Detailed Logging**: Server-side error logging for debugging
+- **User-Friendly Messages**: Clear error messages for users
+
+---
+
+## 📊 Usage Patterns
+
+### Form Submissions
+```tsx
+// Progressive enhancement - works without JS
+<form action={createPost}>
+  <input name="content" required />
+  <button type="submit">Post</button>
+</form>
+```
+
+### Server Components
+```tsx
+// Server-side data fetching
+const { posts, pagination } = await getPosts({ page: 1, limit: 10 })
+```
+
+### Error Handling
+```tsx
+// All actions return { success: boolean, data?: any, error?: string }
+const result = await createPost(formData)
+if (!result.success) {
+  // Handle error
+}
+```
+
+---
+
+## 🔄 Real-time Integration Points
+
+### WebSocket Events Needed
+- **Post Creation**: Notify followers of new posts
+- **Like/Unlike**: Real-time like count updates
+- **Comments**: Live comment notifications
+- **Club Activities**: Club announcements and events
+- **Messages**: Chat functionality (future)
+
+### Notification Triggers
+- **Follow**: New follower notifications
+- **Like/Comment**: Engagement notifications
+- **Club Invites**: Club membership invitations
+- **Event Reminders**: Upcoming club events
+
+---
+
+## 📈 Scalability Considerations
+
+### Database Optimization
+- **Connection Pooling**: Prisma handles connection management
+- **Query Optimization**: Selective includes reduce data transfer
+- **Indexing**: Proper indexes on frequently queried fields
+
+### Caching Strategy
+- **Redis Integration**: Consider Redis for session storage
+- **CDN**: Static assets and media files
+- **Edge Caching**: Vercel Edge Functions for global performance
+
+### Monitoring
+- **Error Tracking**: Comprehensive error logging
+- **Performance Metrics**: Query performance monitoring
+- **User Analytics**: Track engagement patterns
+
+---
+
+## 🎯 Future Enhancements
+
+### Planned Features
+- **File Upload**: Supabase storage integration
+- **Search**: Full-text search with Elasticsearch
+- **Notifications**: Real-time notification system
+- **Chat**: Direct messaging between users
+- **Analytics**: Post engagement analytics
+
+### Technical Debt
+- **Rate Limiting**: Prevent abuse of actions
+- **Input Sanitization**: Enhanced XSS protection
+- **Audit Logging**: Track all user actions
+- **Backup Strategy**: Database backup and recovery
+
+
+
+
+
+
+
+
+
+
+This documentation serves as a comprehensive reference for the UniConnect server actions architecture and implementation details.

@@ -1,0 +1,255 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+In this project, always remember final goal and make it complete step by step.
+
+Product Requirements Document (PRD)
+
+Project Name: UniConnectDate: July 5, 2025Author: Product Team
+
+1. Purpose & Vision
+
+Purpose: Create a real-time social media platform tailored for university students to share research, academic papers, and collaborate within campus clubs.Vision Statement: Enable students to seamlessly discover scholarly content, network through clubs, and communicate instantly without page reloads—fostering an engaged academic community.
+
+2. Background & Context
+
+Existing platforms (Facebook, LinkedIn) aren’t optimized for scholarly collaboration.
+
+Campus clubs lack centralized, real-time communication hubs.
+
+Students demand instant updates (likes, comments, messages) to stay engaged.
+
+3. Goals & Success Metrics
+
+Primary Goals:
+
+Achieve 70% active daily engagement on academic posts within 3 months of launch.
+
+Ensure 100% of clubs have an active page with at least one real-time chat channel.
+
+Maintain <200ms latency for real-time updates (chat, feed activities).
+
+Key Metrics:
+
+Daily Active Users (DAU) / Monthly Active Users (MAU) ratio
+
+Average session duration
+
+Number of papers shared and downloaded
+
+Real-time event latency (chat message delivery, feed update propagation)
+
+4. Target Audience
+
+Undergraduate and graduate students at universities.
+
+Academic clubs and societies (e.g., Robotics Club, Debate Society).
+
+Student researchers publishing and reviewing papers.
+
+5. Feature Overview
+
+5.1 Academic Feed
+
+Post research summaries and full-text academic papers.
+
+Support rich media (PDF embeds, images, videos).
+
+Like, comment, repost.
+
+Real-time feed updates (new posts, comments) via WebSockets or similar.
+
+5.2 Club Pages
+
+Create/manage club pages that function like mini-communities.
+
+Admin roles: President, Secretary, Member.
+
+Post announcements, events, resources.
+
+Real-time update stream for each club page.
+
+5.3 Chat
+
+1-on-1 Chat: Real-time private messaging.
+
+Group Chat: Create custom groups (e.g., study groups, project teams).
+
+Multimedia messaging: text, file attachments (PDFs, images).
+
+Presence indicators (online/offline).
+
+Read receipts and typing indicators.
+
+5.4 Notifications
+
+Real-time push notifications for mentions, messages, club announcements.
+
+In-app notification center.
+
+Email fallback for critical alerts.
+
+5.5 Search & Discovery
+
+Search research posts by title, author, keywords.
+
+Discover clubs by category (Engineering, Arts, Science).
+
+Follow tags and topics; personalized feed.
+
+5.6 Profiles & Roles
+
+Student profiles with academic info (major, year, publications).
+
+Club roles and permissions.
+
+Privacy settings (public vs. private profile, paper visibility).
+
+6. Functional Requirements
+
+ID
+
+Requirement
+
+Priority
+
+Notes
+
+FR1
+
+Real-time feed update without page reload
+
+High
+
+Use WebSocket or SSE
+
+FR2
+
+Real-time 1-on-1 chat message delivery
+
+High
+
+<200ms end-to-end latency
+
+FR3
+
+Real-time group chat messaging
+
+High
+
+Scalable to 100 concurrent users
+
+FR4
+
+Upload and render PDF/Word academic papers
+
+Medium
+
+Preview via embedded viewer
+
+FR5
+
+Create and manage club pages with role-based access
+
+High
+
+Admin controls
+
+FR6
+
+Notification push for in-app and email
+
+Medium
+
+Integrate with push service
+
+FR7
+
+Search filter by keyword, author, club
+
+Medium
+
+Full-text search engine
+
+7. Non-Functional Requirements
+
+Performance: 95th percentile API response <100ms; real-time features <200ms.
+
+Scalability: Support 50k concurrent users; horizontal scaling.
+
+Security: Encryption at-rest and in-transit; role-based access control; OWASP Top 10 compliance.
+
+Reliability: 99.9% uptime; automated failover.
+
+Accessibility: WCAG 2.1 AA compliance.
+
+8. Technical Architecture
+
+Frontend: React with Next.js (App Router); WebSocket client for real-time.
+
+Backend: Node.js with NestJS or Express; WebSocket server (Socket.IO or native).
+
+Database: PostgreSQL for relational data; Redis for pub/sub and caching.
+
+File Storage: AWS S3 for paper uploads.
+
+CI/CD: Automated pipelines with tests and canary deployments.
+
+9. User Flows & Wireframes**
+
+(Include sketches or links to Figma prototypes for feed, chat, club page creation.)
+
+10. Milestones & Timeline
+
+Phase
+
+Deliverable
+
+Timeline
+
+Phase 1
+
+MVP: Feed + 1-on-1 Chat
+
+4 weeks
+
+Phase 2
+
+Club Pages + Group Chat + Notifications
+
+6 weeks
+
+Phase 3
+
+Search & Discovery + Profile Enhancements
+
+4 weeks
+
+Phase 4
+
+Performance Tuning + Accessibility
+
+2 weeks
+
+11. Risks & Mitigations
+
+Real-time scaling issues: Conduct load testing; adopt auto-scaling.
+
+Data privacy for papers: Default to student-controlled visibility.
+
+Adoption barrier: Partner with university clubs for pilot launch.
+
+12. Appendix
+
+Glossary of terms.
+
+API contract samples.
+
+Wireframe references.
+
+
+
+
+End of PRD

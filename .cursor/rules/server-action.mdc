@@ -1,0 +1,35 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+@rule UseServerActions {
+  description: |
+    Use Server Actions in Next.js when handling data mutations that originate from the client and require secure, server-side execution. Avoid creating unnecessary API routes for operations that can be handled by Server Actions.
+
+  goals: [
+    "Simplify frontend/backend communication",
+    "Ensure secure execution of authenticated actions",
+    "Reduce boilerplate compared to traditional REST API setup",
+    "Keep logic co-located with relevant UI components when possible"
+  ]
+
+  usage_criteria: [
+    "Creating or editing posts, comments, or profile data",
+    "Liking, following, or performing other user-triggered state changes",
+    "Any action that modifies data and should only be run on the server",
+    "Secure access to sessions, cookies, or database credentials"
+  ]
+
+  constraints: [
+    "Do not use Server Actions for fetching public data (use traditional data fetching instead)",
+    "Do not use Server Actions for real-time events (use WebSocket or Realtime backend)",
+    "Do not move logic to Server Actions if it needs to be called externally (like from a mobile app)"
+  ]
+
+  implementation_notes: |
+    Server Actions should be co-located near the components that invoke them. All inputs should be validated server-side. Prefer `useFormState` and `useFormStatus` for user feedback when working with forms. Avoid leaking internal logic or sensitive data to the client.
+
+    When necessary, fallback to API routes — but only when Server Actions cannot be used due to technical limitations (e.g. file uploads with special requirements, or third-party callbacks).
+}
+
