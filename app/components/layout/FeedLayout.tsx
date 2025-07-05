@@ -1,23 +1,32 @@
 "use client"
 
-import { ReactNode } from "react"
-import { useSession } from "../providers/SessionProvider"
+import { ReactNode, useState, useRef } from "react"
 import MobileNav from "../navigation/MobileNav"
+import ProfileModal from "../navigation/ProfileModal"
+import NotificationsModal from "../navigation/NotificationsModal"
+import MessagesModal from "../navigation/MessagesModal"
 
 interface FeedLayoutProps {
   children: ReactNode
-  user?: any
+  user: any // required
 }
 
 export default function FeedLayout({ children, user }: FeedLayoutProps) {
-  const { user: sessionUser, signOut } = useSession()
-  
-  // Use session user if available, otherwise fall back to prop
-  const currentUser = sessionUser || user
+  // Remove useSession and all client-side session logic
+
+  const [isProfileOpen, setProfileOpen] = useState(false)
+  const [isNotificationsOpen, setNotificationsOpen] = useState(false)
+  const [isMessagesOpen, setMessagesOpen] = useState(false)
+
+  const profileBtnRef = useRef<HTMLButtonElement>(null) as React.RefObject<HTMLButtonElement>;
+  const notificationsBtnRef = useRef<HTMLButtonElement>(null) as React.RefObject<HTMLButtonElement>;
+  const messagesBtnRef = useRef<HTMLButtonElement>(null) as React.RefObject<HTMLButtonElement>;
 
   const handleSignOut = async () => {
-    await signOut()
+    // Use a form POST or client-side sign out logic if needed
+    window.location.href = "/api/auth/signout";
   }
+
   return (
     <div className="min-h-screen bg-zinc-950">
       {/* Top Navigation Bar */}
@@ -56,56 +65,64 @@ export default function FeedLayout({ children, user }: FeedLayoutProps) {
               </button>
 
               {/* Notifications */}
-              <button className="p-2 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 relative">
-                <span className="text-xl">🔔</span>
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
-              </button>
+              <div className="relative">
+                <button
+                  ref={notificationsBtnRef}
+                  className="p-2 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 relative"
+                  onClick={() => setNotificationsOpen(open => !open)}
+                  aria-label="Open notifications"
+                >
+                  <span className="text-xl">🔔</span>
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
+                </button>
+                <NotificationsModal isOpen={isNotificationsOpen} onClose={() => setNotificationsOpen(false)} buttonRef={notificationsBtnRef} />
+              </div>
 
               {/* Messages */}
-              <button className="p-2 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 relative">
-                <span className="text-xl">💬</span>
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full"></span>
-              </button>
+              <div className="relative">
+                <button
+                  ref={messagesBtnRef}
+                  className="p-2 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 relative"
+                  onClick={() => setMessagesOpen(open => !open)}
+                  aria-label="Open messages"
+                >
+                  <span className="text-xl">💬</span>
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full"></span>
+                </button>
+                <MessagesModal isOpen={isMessagesOpen} onClose={() => setMessagesOpen(false)} buttonRef={messagesBtnRef} />
+              </div>
 
               {/* User Menu */}
               <div className="relative">
-                <button className="flex items-center space-x-2 p-2 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100">
+                <button
+                  ref={profileBtnRef}
+                  className="flex items-center space-x-2 p-2 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+                  onClick={() => setProfileOpen(open => !open)}
+                  aria-label="Open profile menu"
+                >
                   <div className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center">
-                    {currentUser?.profilePic ? (
-                      <img src={currentUser.profilePic} alt={currentUser.name} className="w-8 h-8 rounded-full" />
+                    {user?.profilePic ? (
+                      <img src={user.profilePic} alt={user.name} className="w-8 h-8 rounded-full" />
                     ) : (
                       <span className="text-zinc-300 text-sm">
-                        {currentUser?.name?.charAt(0) || "U"}
+                        {user?.name?.charAt(0) || "U"}
                       </span>
                     )}
                   </div>
                   <span className="hidden sm:block text-sm text-zinc-300">
-                    {currentUser?.name || "User"}
+                    {user?.name || "User"}
                   </span>
                   <span className="hidden sm:block text-sm">▼</span>
                 </button>
-                
-                {/* Dropdown Menu */}
-                <div className="absolute right-0 mt-2 w-48 bg-zinc-800 rounded-md shadow-lg py-1 z-50">
-                  <a href="/profile" className="block px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700">
-                    Profile
-                  </a>
-                  <a href="/settings" className="block px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700">
-                    Settings
-                  </a>
-                  <hr className="border-zinc-700 my-1" />
-                  <button
-                    onClick={handleSignOut}
-                    className="block w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700"
-                  >
-                    Sign out
-                  </button>
-                </div>
+                <ProfileModal isOpen={isProfileOpen} onClose={() => setProfileOpen(false)} buttonRef={profileBtnRef} />
               </div>
             </div>
           </div>
         </div>
       </header>
+
+      {/* Modals */}
+      {/* All modals are now dropdowns in the navbar above */}
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">

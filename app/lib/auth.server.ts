@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import prisma from './prisma'
 import { verifyToken } from './auth'
+import { cache } from "react"
 
 // Get current user from token (for server-side use)
 export const getCurrentUser = async (token: string) => {
@@ -36,7 +37,7 @@ export const getCurrentUser = async (token: string) => {
 }
 
 // Get current user from cookies (for server-side use)
-export const getCurrentUserFromCookies = async () => {
+export const getCurrentUserFromCookies = cache(async () => {
   try {
     const cookieStore = await cookies()
     const authToken = cookieStore.get('auth-token')
@@ -50,4 +51,4 @@ export const getCurrentUserFromCookies = async () => {
     console.error('Error getting current user from cookies:', error)
     return null
   }
-} 
+}) 

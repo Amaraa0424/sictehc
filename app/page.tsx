@@ -28,7 +28,7 @@ export default async function HomePage({
   const tags = searchParams.tags ? searchParams.tags.split(",") : []
 
   return (
-    <FeedLayout>
+    <FeedLayout user={user}>
       <Suspense fallback={
         <div className="space-y-6">
           <FeedSkeleton />
@@ -374,67 +374,10 @@ function TrendingTopic({ tag, count }: { tag: string; count: number }) {
   return (
     <a
       href={`/?tags=${tag}`}
-      className="flex items-center justify-between px-2 py-1 rounded text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
+      className="flex items-center space-x-2 px-2 py-1 rounded text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
     >
-      <span className="text-sm">#{tag}</span>
-      <span className="text-xs text-zinc-500">{count.toLocaleString()}</span>
+      <span className="text-sm font-medium">#{tag.replace(/-/g, ' ')}</span>
+      <span className="ml-auto text-xs bg-zinc-800 rounded px-2 py-0.5 text-zinc-400">{count}</span>
     </a>
-  )
-}
-
-function UserSuggestion({ 
-  id, 
-  name, 
-  username, 
-  bio, 
-  profilePic 
-}: { 
-  id: string
-  name: string
-  username: string
-  bio: string
-  profilePic: string
-}) {
-  return (
-    <div className="flex items-start space-x-3">
-      <div className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center text-xs text-zinc-300">
-        {profilePic ? (
-          <img src={profilePic} alt={name} className="w-8 h-8 rounded-full object-cover" />
-        ) : (
-          <span>{name.charAt(0).toUpperCase()}</span>
-        )}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center space-x-2">
-          <a href={`/users/${username}`} className="text-zinc-100 font-medium text-sm hover:underline">
-            {name}
-          </a>
-        </div>
-        <p className="text-zinc-400 text-xs truncate">@{username}</p>
-        <p className="text-zinc-400 text-xs mt-1 line-clamp-2">{bio}</p>
-      </div>
-    </div>
-  )
-}
-
-function EventCard({ 
-  title, 
-  date, 
-  time, 
-  location 
-}: { 
-  title: string
-  date: string
-  time: string
-  location: string
-}) {
-  return (
-    <div className="p-3 bg-zinc-800 rounded-lg">
-      <h4 className="text-zinc-100 font-medium text-sm mb-1">{title}</h4>
-      <div className="text-zinc-400 text-xs space-y-1">
-        <p>📅 {date} at {time}</p>
-        <p>📍 {location}</p>
-      </div>
-    </div>
   )
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentUserFromCookies } from '../../../lib/auth.server'
-import { getNotifications } from '../../../lib/actions/notifications'
+import { getCurrentUserFromCookies } from '@/app/lib/auth.server'
+import { getNotifications } from '@/app/lib/actions/notifications'
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
 
-    const result = await getNotifications(page, limit)
+    const result = await getNotifications({ page, limit })
     return NextResponse.json(result)
 
   } catch (error) {

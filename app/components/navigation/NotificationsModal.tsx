@@ -1,21 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useSession } from "../providers/SessionProvider"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { 
-  Bell, 
-  Heart, 
-  MessageSquare, 
-  UserPlus, 
+import {
+  Bell,
+  Heart,
+  MessageSquare,
+  UserPlus,
   AtSign,
   Users,
-  Calendar,
-  X,
-  Check
+  Calendar
 } from "lucide-react"
 
 interface Notification {
@@ -26,27 +21,52 @@ interface Notification {
   isRead: boolean
   createdAt: string
   data?: Record<string, any>
+  iconUrl?: string // for custom icons
 }
 
 interface NotificationsModalProps {
   isOpen: boolean
   onClose: () => void
+  buttonRef: React.RefObject<HTMLButtonElement>
 }
 
-export default function NotificationsModal({ isOpen, onClose }: NotificationsModalProps) {
+export default function NotificationsModal({ isOpen, onClose, buttonRef }: NotificationsModalProps) {
   const { user } = useSession()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [tab, setTab] = useState<'all' | 'unread'>('all')
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+    function handleClick(e: MouseEvent) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(e.target as Node)
+      ) {
+        onClose()
+      }
+    }
+    function handleEsc(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose()
+    }
+    document.addEventListener("mousedown", handleClick)
+    document.addEventListener("keydown", handleEsc)
+    return () => {
+      document.removeEventListener("mousedown", handleClick)
+      document.removeEventListener("keydown", handleEsc)
+    }
+  }, [isOpen, onClose, buttonRef])
 
   const fetchNotifications = async () => {
     if (!user) return
-
     setIsLoading(true)
     try {
       const response = await fetch("/api/notifications")
       const result = await response.json()
-      
       if (result.success) {
         setNotifications(result.data.notifications)
         setUnreadCount(result.data.notifications.filter((n: Notification) => !n.isRead).length)
@@ -58,62 +78,29 @@ export default function NotificationsModal({ isOpen, onClose }: NotificationsMod
     }
   }
 
-  const markAsRead = async (notificationId: string) => {
-    try {
-      const response = await fetch(`/api/notifications/${notificationId}/read`, {
-        method: "POST",
-      })
-      
-      if (response.ok) {
-        setNotifications(prev => 
-          prev.map(n => 
-            n.id === notificationId ? { ...n, isRead: true } : n
-          )
-        )
-        setUnreadCount(prev => Math.max(0, prev - 1))
-      }
-    } catch (error) {
-      console.error("Mark as read error:", error)
-    }
-  }
-
-  const markAllAsRead = async () => {
-    try {
-      const response = await fetch("/api/notifications/read-all", {
-        method: "POST",
-      })
-      
-      if (response.ok) {
-        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
-        setUnreadCount(0)
-      }
-    } catch (error) {
-      console.error("Mark all as read error:", error)
-    }
-  }
-
   useEffect(() => {
     if (isOpen) {
       fetchNotifications()
     }
   }, [isOpen, user])
 
-  const getNotificationIcon = (type: string) => {
+  const getNotificationIcon = (type: string, iconUrl?: string) => {
+    if (iconUrl) return <img src={iconUrl} alt="icon" className="h-8 w-8 rounded-full" />
     switch (type) {
       case "LIKE":
-        return <Heart className="h-4 w-4 text-red-500" />
+        return <Heart className="h-6 w-6 text-red-500" />
       case "COMMENT":
-        return <MessageSquare className="h-4 w-4 text-blue-500" />
+        return <MessageSquare className="h-6 w-6 text-blue-500" />
       case "FOLLOW":
-        return <UserPlus className="h-4 w-4 text-green-500" />
+        return <UserPlus className="h-6 w-6 text-green-500" />
       case "MENTION":
-        return <AtSign className="h-4 w-4 text-purple-500" />
+        return <AtSign className="h-6 w-6 text-purple-500" />
       case "CLUB_INVITE":
-        return <Users className="h-4 w-4 text-orange-500" />
+        return <Users className="h-6 w-6 text-orange-500" />
       case "EVENT_REMINDER":
-        return <Calendar className="h-4 w-4 text-indigo-500" />
+        return <Calendar className="h-6 w-6 text-indigo-500" />
       default:
-        return <Bell className="h-4 w-4 text-gray-500" />
+        return <Bell className="h-6 w-6 text-gray-500" />
     }
   }
 
@@ -121,104 +108,72 @@ export default function NotificationsModal({ isOpen, onClose }: NotificationsMod
     const date = new Date(dateString)
     const now = new Date()
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
-    
     if (diffInMinutes < 1) return "Just now"
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`
+    if (diffInMinutes < 60) return `${diffInMinutes}h ago`
     if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`
     return `${Math.floor(diffInMinutes / 1440)}d ago`
   }
 
   if (!isOpen) return null
 
+  // Filter notifications by tab
+  const shownNotifications = tab === 'all' ? notifications : notifications.filter(n => !n.isRead)
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="relative w-full max-w-md mx-4 max-h-[80vh]">
-        <Card className="w-full max-h-full flex flex-col">
-          <CardHeader className="relative flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
-                Notifications
-                {unreadCount > 0 && (
-                  <Badge variant="destructive" className="ml-2">
-                    {unreadCount}
-                  </Badge>
-                )}
-              </CardTitle>
-              <div className="flex items-center gap-2">
-                {unreadCount > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={markAllAsRead}
-                    className="text-xs"
-                  >
-                    <Check className="h-3 w-3 mr-1" />
-                    Mark all read
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                  onClick={onClose}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto space-y-3">
-            {isLoading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-                <p className="mt-2 text-sm text-muted-foreground">Loading notifications...</p>
-              </div>
-            ) : notifications.length === 0 ? (
-              <div className="text-center py-8">
-                <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No notifications yet</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  When you get notifications, they'll show up here
-                </p>
-              </div>
-            ) : (
-              notifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`p-3 rounded-lg border transition-colors cursor-pointer ${
-                    notification.isRead 
-                      ? "bg-background" 
-                      : "bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800"
-                  }`}
-                  onClick={() => !notification.isRead && markAsRead(notification.id)}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 mt-1">
-                      {getNotificationIcon(notification.type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between">
-                        <p className="text-sm font-medium leading-tight">
-                          {notification.title}
-                        </p>
-                        {!notification.isRead && (
-                          <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 ml-2 mt-1"></div>
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-1 leading-tight">
-                        {notification.message}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {formatTime(notification.createdAt)}
-                      </p>
-                    </div>
-                  </div>
+    <div
+      ref={dropdownRef}
+      className="absolute right-0 mt-2 w-96 bg-zinc-900 rounded-xl shadow-2xl z-50 border border-zinc-800"
+      style={{ minWidth: 340, maxWidth: 400, height: 600 }}
+      tabIndex={-1}
+      role="menu"
+      aria-label="Notifications"
+    >
+      <div className="flex flex-col h-full">
+        {/* Tabs */}
+        <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b border-zinc-800">
+          <div className="text-lg font-semibold text-zinc-100">Notifications</div>
+          <div className="flex gap-2">
+            <button
+              className={`px-3 py-1 rounded-full text-sm font-medium ${tab === 'all' ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-400 hover:bg-zinc-800'}`}
+              onClick={() => setTab('all')}
+            >
+              All
+            </button>
+            <button
+              className={`px-3 py-1 rounded-full text-sm font-medium ${tab === 'unread' ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-400 hover:bg-zinc-800'}`}
+              onClick={() => setTab('unread')}
+            >
+              Unread
+            </button>
+          </div>
+        </div>
+        {/* Today Section */}
+        <div className="px-4 pt-2 pb-1 text-xs font-semibold text-zinc-400 uppercase tracking-wide">Today</div>
+        {/* Notification List */}
+        <div className="flex-1 overflow-y-auto pb-2">
+          {isLoading ? (
+            <div className="text-center py-8 text-zinc-400">Loading notifications...</div>
+          ) : shownNotifications.length === 0 ? (
+            <div className="text-center py-8 text-zinc-400">No notifications</div>
+          ) : (
+            shownNotifications.map(notification => (
+              <div
+                key={notification.id}
+                className={`flex items-start gap-3 px-4 py-3 cursor-pointer border-b border-zinc-800 transition-colors hover:bg-zinc-800 relative`}
+              >
+                <div className="flex-shrink-0 mt-1">
+                  {getNotificationIcon(notification.type, notification.iconUrl)}
                 </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
+                <div className="flex-1 min-w-0">
+                  <div className={`font-semibold text-zinc-100 truncate`}>{notification.title}</div>
+                  <div className="text-xs text-zinc-400 truncate">{notification.message}</div>
+                  <div className="text-xs text-zinc-500 mt-1">{formatTime(notification.createdAt)}</div>
+                </div>
+                {!notification.isRead && <span className="w-2 h-2 bg-blue-500 rounded-full mt-2"></span>}
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   )

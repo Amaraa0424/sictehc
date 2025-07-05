@@ -2,11 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
-import { useSession } from "../providers/SessionProvider"
-import ProfileModal from "./ProfileModal"
-import NotificationsModal from "./NotificationsModal"
-import MessagesModal from "./MessagesModal"
-import { Badge } from "@/components/ui/badge"
 import { 
   Home, 
   Search, 
@@ -17,10 +12,17 @@ import {
   Settings,
   LogOut
 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import ProfileModal from "./ProfileModal"
+import NotificationsModal from "./NotificationsModal"
+import MessagesModal from "./MessagesModal"
 
-export default function MobileNav() {
+interface MobileNavProps {
+  user: any;
+}
+
+export default function MobileNav({ user }: MobileNavProps) {
   const pathname = usePathname()
-  const { user, signOut } = useSession()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [showNotificationsModal, setShowNotificationsModal] = useState(false)
@@ -199,7 +201,8 @@ export default function MobileNav() {
                 <button
                   onClick={async () => {
                     setIsMenuOpen(false)
-                    await signOut()
+                    // Navigate to sign out
+                    window.location.href = "/signout"
                   }}
                   className="flex items-center space-x-3 p-3 rounded-lg text-red-400 hover:bg-red-950/20 transition-colors w-full"
                 >
