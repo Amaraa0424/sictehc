@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
-import { prisma } from "@/lib/prisma"
-import { getCurrentUserFromCookies } from "./auth.server"
+import { prisma } from "../prisma"
+import { getCurrentUserFromCookies } from "../auth.server"
 
 // Validation schemas
 const createClubSchema = z.object({

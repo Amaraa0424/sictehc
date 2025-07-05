@@ -9,11 +9,11 @@ const signUpSchema = z.object({
   email: z.string().email('Invalid email address'),
   username: z.string().min(3, 'Username must be at least 3 characters').max(20, 'Username must be less than 20 characters'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  confirmPassword: z.string(),
+  confirmPassword: z.string().optional(),
   program: z.string().optional(),
   year: z.number().min(1).max(10).optional(),
   university: z.string().optional()
-}).refine((data) => data.password === data.confirmPassword, {
+}).refine((data) => !data.confirmPassword || data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"]
 })

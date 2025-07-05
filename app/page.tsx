@@ -1,31 +1,19 @@
-"use client"
-
 import { Suspense } from "react"
-import { useSearchParams } from "next/navigation"
-import { useSession } from "./components/providers/SessionProvider"
+import { getCurrentUserFromCookies } from "./lib/auth.server"
+import { getPosts } from "./lib/actions/posts"
 import FeedLayout from "./components/layout/FeedLayout"
 import FeedSkeleton from "./components/skeletons/FeedSkeleton"
-import SidebarSkeleton from "./components/skeletons/SidebarSkeleton"
-import TrendingSkeleton from "./components/skeletons/TrendingSkeleton"
 import FeedFilters from "./components/feed/FeedFilters"
 import CreatePostCard from "./components/feed/CreatePostCard"
 import PostCard from "./components/feed/PostCard"
 import Pagination from "./components/feed/Pagination"
-import FollowButton from "./components/feed/FollowButton"
 
-export default function HomePage() {
-  const { user, loading } = useSession()
-  const searchParams = useSearchParams()
-  
-  console.log('HomePage - User:', user ? 'Found' : 'Not found', 'Loading:', loading)
-  
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="text-zinc-100">Loading...</div>
-      </div>
-    )
-  }
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: { page?: string; search?: string; tags?: string }
+}) {
+  const user = await getCurrentUserFromCookies()
   
   if (!user) {
     return (
@@ -35,99 +23,94 @@ export default function HomePage() {
     )
   }
 
-  const page = parseInt(searchParams.get('page') || "1")
-  const search = searchParams.get('search') || ""
-  const tags = searchParams.get('tags') ? searchParams.get('tags')!.split(",") : []
-
-  // Mock posts data
-  const posts = [
-    {
-      id: "1",
-      content: "Just published my research on machine learning algorithms for natural language processing. The results show significant improvements in accuracy compared to existing methods.",
-      title: "Advances in NLP: A Comparative Study",
-      abstract: "This paper presents a comprehensive analysis of modern NLP techniques and their applications in real-world scenarios.",
-      author: {
-        id: "1",
-        name: "John Doe",
-        username: "johndoe",
-        profilePic: null
-      },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      visibility: "PUBLIC",
-      mediaType: "TEXT",
-      mediaUrls: [],
-      tags: ["machine-learning", "nlp", "research"],
-      _count: {
-        likes: 42,
-        comments: 8,
-        reposts: 12,
-        views: 156
-      }
-    },
-    {
-      id: "2",
-      content: "Excited to share our findings on blockchain technology in academic environments. The potential for secure, transparent record-keeping is enormous!",
-      title: "Blockchain in Academia",
-      abstract: "Exploring the applications of blockchain technology for academic credential verification and research collaboration.",
-      author: {
-        id: "2",
-        name: "Jane Smith",
-        username: "janesmith",
-        profilePic: null
-      },
-      createdAt: new Date(Date.now() - 86400000).toISOString(),
-      updatedAt: new Date(Date.now() - 86400000).toISOString(),
-      visibility: "PUBLIC",
-      mediaType: "TEXT",
-      mediaUrls: [],
-      tags: ["blockchain", "academia", "technology"],
-      _count: {
-        likes: 28,
-        comments: 15,
-        reposts: 7,
-        views: 89
-      }
-    }
-  ]
-
-  const pagination = {
-    page,
-    pages: 1,
-    total: posts.length,
-    limit: 10
-  }
+  const page = parseInt(searchParams.page || "1")
+  const search = searchParams.search || ""
+  const tags = searchParams.tags ? searchParams.tags.split(",") : []
 
   return (
-    <FeedLayout user={user}>
-      {/* Left Sidebar */}
-      <aside className="hidden lg:block w-64 shrink-0">
-        <Suspense fallback={<SidebarSkeleton />}>
-          <Sidebar user={user} />
-        </Suspense>
-      </aside>
-
-      {/* Main Feed */}
-      <main className="flex-1 max-w-2xl mx-auto">
-        <Suspense fallback={<FeedSkeleton />}>
-          <Feed 
-            user={user}
-            posts={posts}
-            pagination={pagination}
-            page={page}
-            search={search}
-            tags={tags}
-          />
-        </Suspense>
-      </main>
-
-      {/* Right Sidebar - Trending */}
-      <aside className="hidden xl:block w-80 shrink-0">
-        <Suspense fallback={<TrendingSkeleton />}>
-          <TrendingSidebar user={user} />
-        </Suspense>
-      </aside>
+    <FeedLayout>
+      <Suspense fallback={
+        <div className="space-y-6">
+          <FeedSkeleton />
+          <FeedSkeleton />
+          <FeedSkeleton />
+        </div>
+      }>
+        <PostsSection user={user} page={page} search={search} tags={tags} />
+      </Suspense>
     </FeedLayout>
+  )
+}
+
+async function PostsSection({ 
+  user, 
+  page, 
+  search, 
+  tags 
+}: { 
+  user: any
+  page: number
+  search: string
+  tags: string[]
+}) {
+  const result = await getPosts({ page, search, tags })
+  
+  if (!result.success || !result.data) {
+    return (
+      <div className="bg-red-900/20 border border-red-800 rounded-lg p-4">
+        <p className="text-red-400">{result.error || "Failed to fetch posts"}</p>
+      </div>
+    )
+  }
+
+  const { posts, pagination } = result.data
+
+  return (
+    <div className="space-y-6">
+      {/* Create Post */}
+      <CreatePostCard user={user} />
+
+      {/* Filters */}
+      <FeedFilters search={search} tags={tags} />
+
+      {/* Posts */}
+      {posts.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">📚</div>
+          <h3 className="text-xl font-semibold text-zinc-100 mb-2">No posts yet</h3>
+          <p className="text-zinc-400 mb-6">
+            {search || tags.length > 0 
+              ? "No posts match your current filters. Try adjusting your search."
+              : "Be the first to share your research and academic insights!"
+            }
+          </p>
+          {!search && tags.length === 0 && (
+            <button
+              onClick={() => document.querySelector('textarea')?.focus()}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
+            >
+              Create Your First Post
+            </button>
+          )}
+        </div>
+      ) : (
+        <>
+          {posts.map((post: any) => (
+            <PostCard key={post.id} post={post} user={user} />
+          ))}
+
+          {/* Pagination */}
+          {pagination && pagination.totalPages > 1 && (
+            <Pagination pagination={{
+              page: pagination.page,
+              pages: pagination.totalPages,
+              total: pagination.total,
+              limit: pagination.limit
+            }} />
+          )}
+        </>
+      )}
+    </div>
   )
 }
 
@@ -426,7 +409,6 @@ function UserSuggestion({
           <a href={`/users/${username}`} className="text-zinc-100 font-medium text-sm hover:underline">
             {name}
           </a>
-          <FollowButton userId={id} />
         </div>
         <p className="text-zinc-400 text-xs truncate">@{username}</p>
         <p className="text-zinc-400 text-xs mt-1 line-clamp-2">{bio}</p>

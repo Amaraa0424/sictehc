@@ -6,6 +6,7 @@ import { Textarea } from "../../../components/ui/textarea"
 import { Input } from "../../../components/ui/input"
 import { Label } from "../../../components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../../components/ui/select"
+import { createPost } from "../../lib/actions/posts"
 
 interface CreatePostCardProps {
   user: any
@@ -27,25 +28,40 @@ export default function CreatePostCard({ user }: CreatePostCardProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!formData.content.trim()) return
+    
     setIsSubmitting(true)
 
     try {
-      // Mock post creation for now
-      console.log("Creating post:", formData)
+      const formDataToSend = new FormData()
+      formDataToSend.append("content", formData.content)
+      if (formData.title) formDataToSend.append("title", formData.title)
+      if (formData.abstract) formDataToSend.append("abstract", formData.abstract)
+      formDataToSend.append("mediaType", formData.mediaType)
+      formDataToSend.append("visibility", formData.visibility)
+      formData.tags.forEach(tag => formDataToSend.append("tags", tag))
       
-      // Reset form
-      setFormData({
-        content: "",
-        title: "",
-        abstract: "",
-        mediaType: "TEXT",
-        visibility: "PUBLIC",
-        tags: [],
-      })
-      setIsExpanded(false)
-      setTagInput("")
+      const result = await createPost(formDataToSend)
       
-      alert("Post created successfully! (Mock)")
+      if (result.success) {
+        // Reset form
+        setFormData({
+          content: "",
+          title: "",
+          abstract: "",
+          mediaType: "TEXT",
+          visibility: "PUBLIC",
+          tags: [],
+        })
+        setIsExpanded(false)
+        setTagInput("")
+        
+        // Show success message
+        console.log("Post created successfully!")
+      } else {
+        console.error("Failed to create post:", result.error)
+        alert(`Failed to create post: ${result.error}`)
+      }
     } catch (error) {
       console.error("Create post error:", error)
       alert("Something went wrong. Please try again.")
@@ -158,7 +174,6 @@ export default function CreatePostCard({ user }: CreatePostCardProps) {
                   <SelectItem value="IMAGE">Image</SelectItem>
                   <SelectItem value="VIDEO">Video</SelectItem>
                   <SelectItem value="PDF">PDF Document</SelectItem>
-                  <SelectItem value="DOCUMENT">Other Document</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -176,7 +191,7 @@ export default function CreatePostCard({ user }: CreatePostCardProps) {
                 <SelectContent className="bg-zinc-900 border-zinc-700 text-zinc-100">
                   <SelectItem value="PUBLIC">Public</SelectItem>
                   <SelectItem value="PRIVATE">Private</SelectItem>
-                  <SelectItem value="CLUB_ONLY">Club Members Only</SelectItem>
+                  <SelectItem value="FOLLOWERS">Followers Only</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -203,6 +218,8 @@ export default function CreatePostCard({ user }: CreatePostCardProps) {
                     Add
                   </Button>
                 </div>
+                
+                {/* Display Tags */}
                 {formData.tags.length > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {formData.tags.map((tag, index) => (
@@ -228,32 +245,43 @@ export default function CreatePostCard({ user }: CreatePostCardProps) {
         )}
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Button
+        <div className="flex items-center justify-between pt-4 border-t border-zinc-800">
+          <div className="flex items-center space-x-4">
+            <button
               type="button"
-              variant="ghost"
               onClick={() => setIsExpanded(!isExpanded)}
-              className="text-zinc-400 hover:text-zinc-100"
+              className="text-zinc-400 hover:text-zinc-100 text-sm transition-colors"
             >
-              {isExpanded ? "Hide Options" : "Advanced Options"}
-            </Button>
+              {isExpanded ? "Hide" : "Show"} Advanced Options
+            </button>
           </div>
+          
           <div className="flex items-center space-x-2">
             <Button
               type="button"
-              variant="ghost"
-              onClick={() => setIsExpanded(false)}
-              className="text-zinc-400 hover:text-zinc-100"
+              variant="outline"
+              onClick={() => {
+                setFormData({
+                  content: "",
+                  title: "",
+                  abstract: "",
+                  mediaType: "TEXT",
+                  visibility: "PUBLIC",
+                  tags: [],
+                })
+                setTagInput("")
+                setIsExpanded(false)
+              }}
+              className="bg-zinc-800 border-zinc-700 text-zinc-100 hover:bg-zinc-700"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting || !formData.content.trim()}
+              disabled={!formData.content.trim() || isSubmitting}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
-              {isSubmitting ? "Posting..." : "Post"}
+              {isSubmitting ? "Creating..." : "Create Post"}
             </Button>
           </div>
         </div>

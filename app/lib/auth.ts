@@ -3,7 +3,8 @@ import { supabase } from './supabase'
 import prisma from './prisma'
 import { jwtVerify, SignJWT } from 'jose'
 
-const JWT_SECRET = new TextEncoder().encode('my-very-secret-key')
+console.log('JWT_SECRET:', process.env.JWT_SECRET)
+const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET!)
 
 export interface JWTPayload {
   userId: string

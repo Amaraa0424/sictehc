@@ -19,6 +19,7 @@ const authRoutes = ["/login", "/register"]
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+  const token = request.cookies.get("auth-token")?.value
 
   // Skip middleware for API routes and static files
   if (
@@ -30,72 +31,33 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  try {
-    // Check if user is authenticated by looking for auth token cookie
-    const authToken = request.cookies.get("auth-token")
-    
-    console.log('Middleware - Pathname:', pathname, 'Auth token exists:', !!authToken)
-    
-    // Only redirect to /login if not already on an auth route
-    if (
-      !authToken &&
-      protectedRoutes.some(route => pathname.startsWith(route)) &&
-      !authRoutes.some(route => pathname.startsWith(route))
-    ) {
-      console.log('Middleware - Redirecting to login (no token)')
-      const loginUrl = new URL("/login", request.url)
-      // Only set redirect if not already on /login or /register
-      if (!authRoutes.some(route => pathname.startsWith(route))) {
-        loginUrl.searchParams.set("redirect", pathname)
-      }
-      return NextResponse.redirect(loginUrl)
+  // If no token, allow access to login/register
+  if (!token) {
+    if (pathname.startsWith('/login') || pathname.startsWith('/register')) {
+      return NextResponse.next()
     }
-
-    // Auth token exists, verify it
-    if (authToken) {
-      try {
-        const payload = await verifyToken(authToken.value)
-        console.log('Middleware - Token verification result:', payload ? 'Valid' : 'Invalid')
-        
-        if (!payload) {
-          // Invalid token, clear cookie and redirect to login
-          console.log('Middleware - Invalid token, clearing cookie')
-          const response = NextResponse.redirect(new URL("/login", request.url))
-          response.cookies.delete("auth-token")
-          return response
-        }
-
-        // Valid token
-        if (authRoutes.some(route => pathname.startsWith(route))) {
-          // User is logged in but trying to access auth pages, redirect to home
-          console.log('Middleware - Authenticated user accessing auth page, redirecting to home')
-          return NextResponse.redirect(new URL("/", request.url))
-        }
-
-        // Add user info to headers for use in components
-        const response = NextResponse.next()
-        response.headers.set("x-user-id", payload.userId)
-        response.headers.set("x-user-email", payload.email)
-        
-        console.log('Middleware - Allowing access to protected route')
-        return response
-      } catch (error) {
-        // Token verification failed, clear cookie and redirect to login
-        console.error("Token verification failed:", error)
-        const response = NextResponse.redirect(new URL("/login", request.url))
-        response.cookies.delete("auth-token")
-        return response
-      }
-    }
-
-    // Allow access to public routes
-    console.log('Middleware - Allowing access to public route')
-    return NextResponse.next()
-  } catch (error) {
-    console.error("Middleware error:", error)
-    // On error, allow the request to continue (fail open)
-    return NextResponse.next()
+    // Redirect to login for protected routes
+    return NextResponse.redirect(new URL('/login', request.url))
   }
+
+  // Verify token (signature/expiry only)
+  let payload = null
+  try {
+    payload = await verifyToken(token)
+  } catch {
+    // Invalid token, clear cookie and redirect to login
+    const response = NextResponse.redirect(new URL('/login', request.url))
+    response.cookies.delete('auth-token')
+    return response
+  }
+
+  // If authenticated and trying to access login/register, redirect to home
+  if ((pathname.startsWith('/login') || pathname.startsWith('/register'))) {
+    return NextResponse.redirect(new URL('/', request.url))
+  }
+
+  // Allow access to all other routes
+  return NextResponse.next()
 }
 
 export const config = {

@@ -1,9 +1,19 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "../../../components/ui/button"
 import { Textarea } from "../../../components/ui/textarea"
 import { formatDistanceToNow } from "date-fns"
+import { 
+  likePost, 
+  unlikePost, 
+  repost, 
+  unrepost, 
+  savePost, 
+  unsavePost,
+  createComment
+} from "../../lib/actions/posts"
+import { createLikeNotification, createCommentNotification } from "../../lib/actions/notifications"
 
 interface PostCardProps {
   post: any
@@ -11,22 +21,49 @@ interface PostCardProps {
 }
 
 export default function PostCard({ post, user }: PostCardProps) {
-  const [isLiked, setIsLiked] = useState(false) // This would be determined from server data
+  const [isLiked, setIsLiked] = useState(false)
   const [isReposted, setIsReposted] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
   const [showComments, setShowComments] = useState(false)
   const [commentText, setCommentText] = useState("")
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
   const [isSubmittingAction, setIsSubmittingAction] = useState(false)
+  const [likeCount, setLikeCount] = useState(post._count?.likes || 0)
+  const [repostCount, setRepostCount] = useState(post._count?.reposts || 0)
+  const [commentCount, setCommentCount] = useState(post._count?.comments || 0)
+
+  // Check initial state from post data
+  useEffect(() => {
+    // In a real app, you'd check if the current user has liked/reposted/saved this post
+    // For now, we'll assume they haven't
+    setIsLiked(false)
+    setIsReposted(false)
+    setIsSaved(false)
+  }, [post.id])
 
   const handleLike = async () => {
     if (!user) return
     setIsSubmittingAction(true)
     
     try {
-      // Mock like action
-      console.log("Liking post:", post.id)
-      setIsLiked(!isLiked)
+      if (isLiked) {
+        const result = await unlikePost(post.id)
+        if (result.success) {
+          setIsLiked(false)
+          setLikeCount((prev: number) => Math.max(0, prev - 1))
+        }
+      } else {
+        const result = await likePost(post.id)
+        if (result.success) {
+          setIsLiked(true)
+          setLikeCount((prev: number) => prev + 1)
+          
+          // Create notification for the post author
+          if (post.author.id !== user.id) {
+            await createLikeNotification(post.id, post.author.id, user.id)
+          }
+        }
+      }
     } catch (error) {
       console.error("Like action error:", error)
     } finally {
@@ -39,9 +76,19 @@ export default function PostCard({ post, user }: PostCardProps) {
     setIsSubmittingAction(true)
     
     try {
-      // Mock repost action
-      console.log("Reposting:", post.id)
-      setIsReposted(!isReposted)
+      if (isReposted) {
+        const result = await unrepost(post.id)
+        if (result.success) {
+          setIsReposted(false)
+          setRepostCount((prev: number) => Math.max(0, prev - 1))
+        }
+      } else {
+        const result = await repost(post.id)
+        if (result.success) {
+          setIsReposted(true)
+          setRepostCount((prev: number) => prev + 1)
+        }
+      }
     } catch (error) {
       console.error("Repost action error:", error)
     } finally {
@@ -54,9 +101,17 @@ export default function PostCard({ post, user }: PostCardProps) {
     setIsSubmittingAction(true)
     
     try {
-      // Mock save action
-      console.log("Saving post:", post.id)
-      setIsSaved(!isSaved)
+      if (isSaved) {
+        const result = await unsavePost(post.id)
+        if (result.success) {
+          setIsSaved(false)
+        }
+      } else {
+        const result = await savePost(post.id)
+        if (result.success) {
+          setIsSaved(true)
+        }
+      }
     } catch (error) {
       console.error("Save action error:", error)
     } finally {
@@ -71,10 +126,19 @@ export default function PostCard({ post, user }: PostCardProps) {
     setIsSubmittingComment(true)
     
     try {
-      // Mock comment creation
-      console.log("Adding comment to post:", post.id, commentText)
-      setCommentText("")
-      alert("Comment added! (Mock)")
+      const formData = new FormData()
+      formData.append("content", commentText)
+      
+      const result = await createComment(post.id, formData)
+      if (result.success) {
+        setCommentText("")
+        setCommentCount((prev: number) => prev + 1)
+        
+        // Create notification for the post author
+        if (post.author.id !== user.id) {
+          await createCommentNotification(post.id, post.author.id, user.id)
+        }
+      }
     } catch (error) {
       console.error("Comment error:", error)
     } finally {
@@ -108,6 +172,9 @@ export default function PostCard({ post, user }: PostCardProps) {
               {post.author.name}
             </a>
             <span className="text-zinc-400">@{post.author.username}</span>
+            {post.author.isVerified && (
+              <span className="text-blue-400">✓</span>
+            )}
             <span className="text-zinc-500">•</span>
             <span className="text-zinc-400 text-sm">
               {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
@@ -186,10 +253,10 @@ export default function PostCard({ post, user }: PostCardProps) {
       {/* Post Stats */}
       <div className="flex items-center justify-between text-sm text-zinc-400 border-t border-zinc-800 pt-3">
         <div className="flex items-center space-x-4">
-          <span>{post._count.views || 0} views</span>
-          <span>{post._count.likes} likes</span>
-          <span>{post._count.comments} comments</span>
-          <span>{post._count.reposts} reposts</span>
+          <span>{post.viewCount || 0} views</span>
+          <span>{likeCount} likes</span>
+          <span>{commentCount} comments</span>
+          <span>{repostCount} reposts</span>
         </div>
       </div>
 
@@ -200,22 +267,22 @@ export default function PostCard({ post, user }: PostCardProps) {
           <button
             onClick={handleLike}
             disabled={isSubmittingAction}
-            className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
+            className={`flex items-center space-x-2 transition-colors ${
               isLiked 
-                ? "text-red-400 bg-red-900/20" 
-                : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+                ? "text-red-500 hover:text-red-400" 
+                : "text-zinc-400 hover:text-zinc-100"
             }`}
           >
-            <span className="text-lg">{isLiked ? "❤️" : "🤍"}</span>
+            <span className="text-xl">{isLiked ? "❤️" : "🤍"}</span>
             <span className="text-sm">Like</span>
           </button>
 
           {/* Comment Button */}
           <button
             onClick={() => setShowComments(!showComments)}
-            className="flex items-center space-x-2 px-3 py-2 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
+            className="flex items-center space-x-2 text-zinc-400 hover:text-zinc-100 transition-colors"
           >
-            <span className="text-lg">💬</span>
+            <span className="text-xl">💬</span>
             <span className="text-sm">Comment</span>
           </button>
 
@@ -223,13 +290,13 @@ export default function PostCard({ post, user }: PostCardProps) {
           <button
             onClick={handleRepost}
             disabled={isSubmittingAction}
-            className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
+            className={`flex items-center space-x-2 transition-colors ${
               isReposted 
-                ? "text-green-400 bg-green-900/20" 
-                : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+                ? "text-green-500 hover:text-green-400" 
+                : "text-zinc-400 hover:text-zinc-100"
             }`}
           >
-            <span className="text-lg">{isReposted ? "🔄" : "📤"}</span>
+            <span className="text-xl">{isReposted ? "🔄" : "📤"}</span>
             <span className="text-sm">Repost</span>
           </button>
 
@@ -237,73 +304,53 @@ export default function PostCard({ post, user }: PostCardProps) {
           <button
             onClick={handleSave}
             disabled={isSubmittingAction}
-            className={`flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${
+            className={`flex items-center space-x-2 transition-colors ${
               isSaved 
-                ? "text-yellow-400 bg-yellow-900/20" 
-                : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100"
+                ? "text-yellow-500 hover:text-yellow-400" 
+                : "text-zinc-400 hover:text-zinc-100"
             }`}
           >
-            <span className="text-lg">{isSaved ? "🔖" : "📌"}</span>
+            <span className="text-xl">{isSaved ? "⭐" : "☆"}</span>
             <span className="text-sm">Save</span>
           </button>
         </div>
 
         {/* Share Button */}
-        <button className="flex items-center space-x-2 px-3 py-2 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-colors">
-          <span className="text-lg">📤</span>
-          <span className="text-sm">Share</span>
+        <button className="text-zinc-400 hover:text-zinc-100 transition-colors">
+          <span className="text-xl">📤</span>
         </button>
       </div>
 
       {/* Comments Section */}
       {showComments && (
         <div className="border-t border-zinc-800 pt-4 space-y-4">
+          <h4 className="text-zinc-100 font-medium">Comments</h4>
+          
           {/* Comment Form */}
-          {user && (
-            <form onSubmit={handleComment} className="space-y-3">
-              <div className="flex items-start space-x-3">
-                <div className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center flex-shrink-0">
-                  {user.profilePic ? (
-                    <img 
-                      src={user.profilePic} 
-                      alt={user.name}
-                      className="w-8 h-8 rounded-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-zinc-300 text-xs font-semibold">
-                      {user.name.charAt(0).toUpperCase()}
-                    </span>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <Textarea
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    placeholder="Write a comment..."
-                    className="bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-400 resize-none"
-                    rows={2}
-                  />
-                  <div className="flex justify-end mt-2">
-                    <Button
-                      type="submit"
-                      disabled={isSubmittingComment || !commentText.trim()}
-                      size="sm"
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      {isSubmittingComment ? "Posting..." : "Comment"}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </form>
-          )}
+          <form onSubmit={handleComment} className="space-y-3">
+            <Textarea
+              placeholder="Write a comment..."
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              className="bg-zinc-800 border-zinc-700 text-zinc-100 placeholder-zinc-400"
+              rows={2}
+            />
+            <div className="flex justify-end">
+              <Button
+                type="submit"
+                disabled={!commentText.trim() || isSubmittingComment}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {isSubmittingComment ? "Posting..." : "Post Comment"}
+              </Button>
+            </div>
+          </form>
 
           {/* Comments List */}
           <div className="space-y-3">
-            {/* This would be populated with actual comments */}
-            <div className="text-center text-zinc-400 text-sm py-4">
-              No comments yet. Be the first to comment!
-            </div>
+            <p className="text-zinc-400 text-sm">
+              Comments will appear here when implemented
+            </p>
           </div>
         </div>
       )}
