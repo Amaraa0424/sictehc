@@ -54,6 +54,12 @@ model User {
   userTags      UserTag[]
   savedPosts    SavedPost[]
 
+  // Friend system relations
+  sentFriendRequests     FriendRequest[] @relation("FriendRequestFrom")
+  receivedFriendRequests FriendRequest[] @relation("FriendRequestTo")
+  friends                Friend[]        @relation("UserFriends")
+  friendOf               Friend[]        @relation("FriendOf")
+
   @@map("users")
 }
 
@@ -160,6 +166,35 @@ model Follow {
 
   @@unique([followerId, followingId])
   @@map("follows")
+}
+
+// Friend request model
+model FriendRequest {
+  id        String   @id @default(cuid())
+  fromId    String
+  toId      String
+  status    FriendRequestStatus @default(PENDING)
+  createdAt DateTime @default(now())
+
+  from      User     @relation("FriendRequestFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to        User     @relation("FriendRequestTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@unique([fromId, toId])
+  @@map("friend_requests")
+}
+
+// Friend model
+model Friend {
+  id        String   @id @default(cuid())
+  userId    String
+  friendId  String
+  createdAt DateTime @default(now())
+
+  user      User     @relation("UserFriends", fields: [userId], references: [id], onDelete: Cascade)
+  friend    User     @relation("FriendOf", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, friendId])
+  @@map("friends")
 }
 
 // Club model for academic clubs
@@ -315,6 +350,7 @@ model Notification {
   isRead    Boolean          @default(false)
   readAt    DateTime?
   createdAt DateTime         @default(now())
+  status    NotificationStatus? @default(PENDING)
 
   // Relations
   user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -381,4 +417,18 @@ enum NotificationType {
   CLUB_INVITE
   CLUB_ANNOUNCEMENT
   EVENT_REMINDER
+  FRIEND_ACCEPTED
+}
+
+enum FriendRequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum NotificationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
 }

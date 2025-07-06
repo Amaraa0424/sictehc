@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentUserFromCookies } from '../../../../../lib/auth.server'
-import { markNotificationAsRead } from '../../../../../lib/actions/notifications'
+import { getCurrentUserFromCookies } from '@/app/lib/auth.server'
+import { markNotificationAsRead } from '@/app/lib/actions/notifications'
 
 export async function POST(
   request: NextRequest,

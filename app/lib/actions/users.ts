@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache"
 import { z } from "zod"
 import { prisma } from "../prisma"
 import { getCurrentUserFromCookies } from "../auth.server"
+import { Prisma } from "@prisma/client"
+import { PrismaClient } from "@prisma/client"
 
 // Validation schemas
 const updateProfileSchema = z.object({
@@ -534,5 +536,258 @@ export async function searchUsers(query: string, options: {
   } catch (error) {
     console.error("Search users error:", error)
     throw new Error("Failed to search users")
+  }
+}
+
+// --- Friend Request System ---
+
+// Send Friend Request
+export async function sendFriendRequest(targetUserId: string) {
+  try {
+    const user = await getCurrentUserFromCookies()
+    if (!user) throw new Error("Unauthorized")
+    if (user.id === targetUserId) throw new Error("Cannot friend yourself")
+
+    // Check if already friends or request exists
+    const existing = await prisma.friendRequest.findFirst({
+      where: {
+        OR: [
+          { fromId: user.id, toId: targetUserId },
+          { fromId: targetUserId, toId: user.id },
+        ],
+      },
+    })
+    if (existing) throw new Error("Friend request already exists or pending")
+
+    // Prevent duplicate notifications
+    const existingNotif = await prisma.notification.findFirst({
+      where: {
+        userId: targetUserId,
+        type: "FOLLOW",
+        data: {
+          path: ["fromUserId"],
+          equals: user.id,
+        },
+        status: { notIn: ["DECLINED", "CANCELLED"] },
+      },
+    })
+    if (!existingNotif) {
+      await prisma.notification.create({
+        data: {
+          userId: targetUserId,
+          type: "FOLLOW",
+          title: "New Friend Request",
+          message: `${user.name} (@${user.username}) sent you a friend request`,
+          data: JSON.stringify({
+            fromUserId: user.id,
+            fromUserName: user.name,
+            fromUserUsername: user.username,
+          }),
+          status: "PENDING",
+        },
+      })
+    }
+
+    await prisma.friendRequest.create({
+      data: {
+        fromId: user.id,
+        toId: targetUserId,
+        status: "PENDING",
+      },
+    })
+
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to send friend request" }
+  }
+}
+
+// Cancel Friend Request (sent by current user)
+export async function cancelFriendRequest(targetUserId: string) {
+  try {
+    const user = await getCurrentUserFromCookies()
+    if (!user) throw new Error("Unauthorized")
+    await prisma.friendRequest.deleteMany({
+      where: {
+        fromId: user.id,
+        toId: targetUserId,
+        status: "PENDING",
+      },
+    })
+    // Mark the related notification as CANCELLED
+    await prisma.notification.updateMany({
+      where: {
+        userId: targetUserId,
+        type: "FOLLOW",
+        status: "PENDING",
+        data: {
+          path: ["fromUserId"],
+          equals: user.id,
+        },
+      },
+      data: { status: "CANCELLED" },
+    })
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to cancel friend request" }
+  }
+}
+
+// Accept Friend Request (received by current user)
+export async function acceptFriendRequest(fromUserId: string) {
+  const prismaTx = prisma as PrismaClient
+  try {
+    const user = await getCurrentUserFromCookies()
+    if (!user) throw new Error("Unauthorized")
+    if (!fromUserId || typeof fromUserId !== 'string') {
+      console.error('[acceptFriendRequest] Invalid fromUserId:', fromUserId)
+      throw new Error('Invalid sender for friend request')
+    }
+    console.log('[acceptFriendRequest] Creating FRIEND_ACCEPTED notification for userId:', fromUserId, 'by:', user.id)
+    const result = await prismaTx.$transaction(async (tx) => {
+      // Update request status
+      const reqUpdate = await tx.friendRequest.updateMany({
+        where: {
+          fromId: fromUserId,
+          toId: user.id,
+          status: "PENDING",
+        },
+        data: { status: "ACCEPTED" },
+      })
+      // Find all relevant FOLLOW notifications for both users
+      const notifs1 = await tx.notification.findMany({
+        where: {
+          userId: user.id,
+          type: "FOLLOW",
+        },
+      })
+      const notifs2 = await tx.notification.findMany({
+        where: {
+          userId: fromUserId,
+          type: "FOLLOW",
+        },
+      })
+      // Filter by data.fromUserId
+      const toUpdate = [
+        ...notifs1.filter(n => n.data && (typeof n.data === 'object' ? n.data.fromUserId : JSON.parse(n.data).fromUserId) === fromUserId),
+        ...notifs2.filter(n => n.data && (typeof n.data === 'object' ? n.data.fromUserId : JSON.parse(n.data).fromUserId) === user.id),
+      ]
+      for (const notif of toUpdate) {
+        await tx.notification.update({
+          where: { id: notif.id },
+          data: { status: "ACCEPTED" },
+        })
+      }
+      console.log('[acceptFriendRequest] Notifications updated:', toUpdate.length)
+      // Create friendship (bi-directional)
+      let friendsCreate = null
+      friendsCreate = await tx.friend.createMany({
+        data: [
+          { userId: user.id, friendId: fromUserId },
+          { userId: fromUserId, friendId: user.id },
+        ],
+        skipDuplicates: true,
+      })
+      return { reqUpdate, friendsCreate }
+    })
+    console.log("[acceptFriendRequest] transaction result:", result)
+    return { success: true }
+  } catch (error) {
+    console.error("[acceptFriendRequest] error:", error)
+    return { success: false, error: error instanceof Error ? error.message : "Failed to accept friend request" }
+  }
+}
+
+// Decline Friend Request (received by current user)
+export async function declineFriendRequest(fromUserId: string) {
+  try {
+    const user = await getCurrentUserFromCookies()
+    if (!user) throw new Error("Unauthorized")
+    await prisma.friendRequest.updateMany({
+      where: {
+        fromId: fromUserId,
+        toId: user.id,
+        status: "PENDING",
+      },
+      data: { status: "DECLINED" },
+    })
+    // Update notification status to DECLINED
+    await prisma.notification.updateMany({
+      where: {
+        userId: user.id,
+        type: "FOLLOW",
+        status: "PENDING",
+        data: {
+          path: ["fromUserId"],
+          equals: fromUserId,
+        },
+      },
+      data: { status: "DECLINED" },
+    })
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to decline friend request" }
+  }
+}
+
+// Remove Friend
+export async function removeFriend(targetUserId: string) {
+  try {
+    const user = await getCurrentUserFromCookies()
+    if (!user) throw new Error("Unauthorized")
+    await prisma.friend.deleteMany({
+      where: {
+        OR: [
+          { userId: user.id, friendId: targetUserId },
+          { userId: targetUserId, friendId: user.id },
+        ],
+      },
+    })
+    // Optionally, also delete any accepted friend requests
+    await prisma.friendRequest.deleteMany({
+      where: {
+        OR: [
+          { fromId: user.id, toId: targetUserId },
+          { fromId: targetUserId, toId: user.id },
+        ],
+        status: "ACCEPTED",
+      },
+    })
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to remove friend" }
+  }
+}
+
+// Get Relationship Status
+export async function getRelationshipStatus(targetUserId: string) {
+  try {
+    const user = await getCurrentUserFromCookies()
+    if (!user) return { isFollowing: false, isFriend: false, requestSent: false, requestReceived: false }
+    if (user.id === targetUserId) return { isFollowing: false, isFriend: false, requestSent: false, requestReceived: false }
+
+    // Following
+    const follow = await prisma.follow.findUnique({
+      where: { followerId_followingId: { followerId: user.id, followingId: targetUserId } },
+    })
+    // Friends
+    const friend = await prisma.friend.findUnique({
+      where: { userId_friendId: { userId: user.id, friendId: targetUserId } },
+    })
+    // Friend Requests
+    const sentRequest = await prisma.friendRequest.findFirst({
+      where: { fromId: user.id, toId: targetUserId, status: "PENDING" },
+    })
+    const receivedRequest = await prisma.friendRequest.findFirst({
+      where: { fromId: targetUserId, toId: user.id, status: "PENDING" },
+    })
+    return {
+      isFollowing: !!follow,
+      isFriend: !!friend,
+      requestSent: !!sentRequest,
+      requestReceived: !!receivedRequest,
+    }
+  } catch (error) {
+    return { isFollowing: false, isFriend: false, requestSent: false, requestReceived: false }
   }
 } 

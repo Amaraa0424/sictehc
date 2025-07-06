@@ -9,9 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 interface FeedFiltersProps {
   search: string
   tags: string[]
+  onRefresh?: () => void
 }
 
-export default function FeedFilters({ search, tags }: FeedFiltersProps) {
+export default function FeedFilters({ search, tags, onRefresh }: FeedFiltersProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [localSearch, setLocalSearch] = useState(search)
@@ -118,6 +119,17 @@ export default function FeedFilters({ search, tags }: FeedFiltersProps) {
           Clear
         </Button>
       )}
+      {/* Refresh Button */}
+      <Button
+        onClick={onRefresh}
+        variant="secondary"
+        size="sm"
+        className="flex items-center gap-1"
+        aria-label="Refresh posts"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582M20 20v-5h-.581M5.5 19A9 9 0 1 1 19 5.5" /></svg>
+        Refresh
+      </Button>
     </div>
   )
 } 

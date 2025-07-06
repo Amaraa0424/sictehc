@@ -1,115 +1,98 @@
-import { Suspense } from "react"
-import { getCurrentUserFromCookies } from "./lib/auth.server"
-import { getPosts } from "./lib/actions/posts"
+"use client"
+
+import { useState, useEffect } from "react"
+import { useSession } from "./components/providers/SessionProvider"
 import FeedLayout from "./components/layout/FeedLayout"
 import FeedSkeleton from "./components/skeletons/FeedSkeleton"
 import FeedFilters from "./components/feed/FeedFilters"
 import CreatePostCard from "./components/feed/CreatePostCard"
 import PostCard from "./components/feed/PostCard"
 import Pagination from "./components/feed/Pagination"
+import LoginForm from "./components/auth/LoginForm"
+import RegisterForm from "./components/auth/RegisterForm"
+import { Card } from "../components/ui/card"
 
-export default async function HomePage({
-  searchParams,
-}: {
-  searchParams: { page?: string; search?: string; tags?: string }
-}) {
-  const user = await getCurrentUserFromCookies()
-  
-  if (!user) {
+export default function HomePage() {
+  const [tab, setTab] = useState<'login' | 'register'>('login')
+  const { user, loading } = useSession()
+  const [posts, setPosts] = useState<any[]>([])
+  const [postsLoading, setPostsLoading] = useState(false)
+  const [postsError, setPostsError] = useState("")
+
+  const fetchPosts = () => {
+    if (user) {
+      setPostsLoading(true)
+      fetch("/api/posts?page=1&limit=10")
+        .then(res => res.json())
+        .then(result => {
+          if (result.success && result.data) {
+            setPosts(result.data.posts)
+          } else {
+            setPostsError(result.error || "Failed to fetch posts")
+          }
+        })
+        .catch(() => setPostsError("Failed to fetch posts"))
+        .finally(() => setPostsLoading(false))
+    }
+  }
+
+  useEffect(() => {
+    fetchPosts()
+  }, [user])
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="text-zinc-100">Please log in to continue.</div>
+        <FeedSkeleton />
       </div>
     )
   }
 
-  const page = parseInt(searchParams.page || "1")
-  const search = searchParams.search || ""
-  const tags = searchParams.tags ? searchParams.tags.split(",") : []
-
-  return (
-    <FeedLayout user={user}>
-      <Suspense fallback={
-        <div className="space-y-6">
-          <FeedSkeleton />
-          <FeedSkeleton />
-          <FeedSkeleton />
-        </div>
-      }>
-        <PostsSection user={user} page={page} search={search} tags={tags} />
-      </Suspense>
-    </FeedLayout>
-  )
-}
-
-async function PostsSection({ 
-  user, 
-  page, 
-  search, 
-  tags 
-}: { 
-  user: any
-  page: number
-  search: string
-  tags: string[]
-}) {
-  const result = await getPosts({ page, search, tags })
-  
-  if (!result.success || !result.data) {
+  if (user) {
+    // Render main feed/dashboard for authenticated users
     return (
-      <div className="bg-red-900/20 border border-red-800 rounded-lg p-4">
-        <p className="text-red-400">{result.error || "Failed to fetch posts"}</p>
-      </div>
+      <FeedLayout user={user}>
+        <div className="flex-1 space-y-6">
+          <CreatePostCard user={user} />
+          <FeedFilters search="" tags={[]} onRefresh={fetchPosts} />
+          {postsLoading ? (
+            <FeedSkeleton />
+          ) : postsError ? (
+            <div className="text-red-400 bg-red-900/20 border border-red-800 rounded-lg p-4">{postsError}</div>
+          ) : posts.length === 0 ? (
+            <div className="text-center py-12 text-zinc-400">No posts yet. Be the first to share your research!</div>
+          ) : (
+            posts.map(post => <PostCard key={post.id} post={post} user={user} />)
+          )}
+        </div>
+      </FeedLayout>
     )
   }
 
-  const { posts, pagination } = result.data
-
+  // Not logged in: show login/register
   return (
-    <div className="space-y-6">
-      {/* Create Post */}
-      <CreatePostCard user={user} />
-
-      {/* Filters */}
-      <FeedFilters search={search} tags={tags} />
-
-      {/* Posts */}
-      {posts.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="text-6xl mb-4">📚</div>
-          <h3 className="text-xl font-semibold text-zinc-100 mb-2">No posts yet</h3>
-          <p className="text-zinc-400 mb-6">
-            {search || tags.length > 0 
-              ? "No posts match your current filters. Try adjusting your search."
-              : "Be the first to share your research and academic insights!"
-            }
-          </p>
-          {!search && tags.length === 0 && (
-            <button
-              onClick={() => document.querySelector('textarea')?.focus()}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
-            >
-              Create Your First Post
-            </button>
-          )}
+    <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+      <Card className="w-full max-w-md p-0 shadow-2xl border border-zinc-800 bg-zinc-900 rounded-2xl">
+        <div className="flex justify-center pt-6 pb-2 gap-2">
+          <button
+            className={`px-6 py-2 rounded-full font-semibold transition-colors focus:outline-none text-sm ${tab === 'login' ? 'bg-blue-600 text-white shadow' : 'bg-zinc-800 text-blue-400 hover:bg-zinc-700'}`}
+            onClick={() => setTab('login')}
+            type="button"
+          >
+            Login
+          </button>
+          <button
+            className={`px-6 py-2 rounded-full font-semibold transition-colors focus:outline-none text-sm ${tab === 'register' ? 'bg-blue-600 text-white shadow' : 'bg-zinc-800 text-blue-400 hover:bg-zinc-700'}`}
+            onClick={() => setTab('register')}
+            type="button"
+          >
+            Register
+          </button>
         </div>
-      ) : (
-        <>
-          {posts.map((post: any) => (
-            <PostCard key={post.id} post={post} user={user} />
-          ))}
-
-          {/* Pagination */}
-          {pagination && pagination.totalPages > 1 && (
-            <Pagination pagination={{
-              page: pagination.page,
-              pages: pagination.totalPages,
-              total: pagination.total,
-              limit: pagination.limit
-            }} />
-          )}
-        </>
-      )}
+        <div className="px-8 pb-8 pt-2">
+          {tab === 'login' ? <LoginForm /> : <RegisterForm />}
+        </div>
+      </Card>
     </div>
   )
 }
@@ -253,7 +236,7 @@ function TrendingSidebar({ user }: { user: any }) {
       <div className="bg-zinc-900 rounded-lg p-4">
         <h3 className="text-zinc-100 font-semibold mb-3">Who to Follow</h3>
         <div className="space-y-3">
-          <UserSuggestion 
+          {/* <UserSuggestion 
             id="1"
             name="Dr. Sarah Chen"
             username="sarahchen"
@@ -273,7 +256,7 @@ function TrendingSidebar({ user }: { user: any }) {
             username="alexthompson"
             bio="PhD Student in ML"
             profilePic=""
-          />
+          /> */}
         </div>
       </div>
 
@@ -281,7 +264,7 @@ function TrendingSidebar({ user }: { user: any }) {
       <div className="bg-zinc-900 rounded-lg p-4">
         <h3 className="text-zinc-100 font-semibold mb-3">Upcoming Events</h3>
         <div className="space-y-3">
-          <EventCard 
+          {/* <EventCard 
             title="AI Research Symposium"
             date="Dec 15, 2024"
             time="2:00 PM"
@@ -292,7 +275,7 @@ function TrendingSidebar({ user }: { user: any }) {
             date="Dec 18, 2024"
             time="10:00 AM"
             location="Room 301"
-          />
+          /> */}
         </div>
       </div>
     </div>

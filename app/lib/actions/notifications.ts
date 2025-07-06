@@ -109,23 +109,6 @@ export async function getNotifications({
     const [notifications, total] = await Promise.all([
       prisma.notification.findMany({
         where: { userId: user.id },
-        include: {
-          fromUser: {
-            select: {
-              id: true,
-              name: true,
-              username: true,
-              profilePic: true,
-            },
-          },
-          post: {
-            select: {
-              id: true,
-              title: true,
-              content: true,
-            },
-          },
-        },
         orderBy: { createdAt: "desc" },
         skip,
         take: limit,
@@ -169,7 +152,7 @@ export async function markNotificationAsRead(notificationId: string) {
         id: notificationId,
         userId: user.id, // Ensure user owns the notification
       },
-      data: { isRead: true },
+      data: { isRead: true, readAt: new Date() },
     })
 
     revalidatePath("/")
@@ -193,7 +176,7 @@ export async function markAllNotificationsAsRead() {
         userId: user.id,
         isRead: false,
       },
-      data: { isRead: true },
+      data: { isRead: true, readAt: new Date() },
     })
 
     revalidatePath("/")

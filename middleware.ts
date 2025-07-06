@@ -4,7 +4,6 @@ import { verifyToken } from "./app/lib/auth"
 
 // Define protected routes that require authentication
 const protectedRoutes = [
-  "/",
   "/explore",
   "/notifications",
   "/messages",
@@ -13,9 +12,6 @@ const protectedRoutes = [
   "/posts",
   "/clubs",
 ]
-
-// Define auth routes that should redirect if user is already logged in
-const authRoutes = ["/login", "/register"]
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -31,13 +27,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // If no token, allow access to login/register
+  // Allow unauthenticated users to access only the root route
   if (!token) {
-    if (pathname.startsWith('/login') || pathname.startsWith('/register')) {
+    if (pathname === "/") {
       return NextResponse.next()
     }
-    // Redirect to login for protected routes
-    return NextResponse.redirect(new URL('/login', request.url))
+    // Redirect to root for all other routes
+    return NextResponse.redirect(new URL('/', request.url))
   }
 
   // Verify token (signature/expiry only)
@@ -45,18 +41,13 @@ export async function middleware(request: NextRequest) {
   try {
     payload = await verifyToken(token)
   } catch {
-    // Invalid token, clear cookie and redirect to login
-    const response = NextResponse.redirect(new URL('/login', request.url))
+    // Invalid token, clear cookie and redirect to root
+    const response = NextResponse.redirect(new URL('/', request.url))
     response.cookies.delete('auth-token')
     return response
   }
 
-  // If authenticated and trying to access login/register, redirect to home
-  if ((pathname.startsWith('/login') || pathname.startsWith('/register'))) {
-    return NextResponse.redirect(new URL('/', request.url))
-  }
-
-  // Allow access to all other routes
+  // Authenticated users can access any route
   return NextResponse.next()
 }
 

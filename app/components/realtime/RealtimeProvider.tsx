@@ -1,6 +1,7 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react"
+import { useEffect, useRef, useState, createContext, useContext, ReactNode } from "react"
+import { supabase } from "@/app/lib/supabase"
 
 interface RealtimeContextType {
   isConnected: boolean
@@ -22,64 +23,76 @@ interface RealtimeProviderProps {
   children: ReactNode
 }
 
+const EVENT_MAP = {
+  comments: {
+    INSERT: "post:commented",
+    DELETE: "post:comment_deleted"
+  },
+  likes: {
+    INSERT: "post:liked",
+    DELETE: "post:liked"
+  },
+  reposts: {
+    INSERT: "post:reposted",
+    DELETE: "post:reposted"
+  },
+  views: {
+    INSERT: "post:viewed"
+  }
+} as const
+
 export default function RealtimeProvider({ children }: RealtimeProviderProps) {
-  const [socket, setSocket] = useState<WebSocket | null>(null)
   const [isConnected, setIsConnected] = useState(false)
-  const [subscribers, setSubscribers] = useState<Map<string, Set<(data: any) => void>>>(new Map())
+  const listeners = useRef(new Map<string, Set<(data: any) => void>>())
 
+  // Subscribe to Supabase realtime changes
   useEffect(() => {
-    // For now, we'll simulate real-time without actual WebSocket
-    // This can be replaced with actual WebSocket connection later
-    console.log("RealtimeProvider initialized (simulated)")
     setIsConnected(true)
-
+    // Comments
+    const commentsChannel = supabase.channel('comments').on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, payload => {
+      const event = EVENT_MAP.comments[payload.eventType as 'INSERT' | 'DELETE']
+      if (event) emit(event, { postId: payload.new?.postId || payload.old?.postId, ...payload.new, ...payload.old })
+    }).subscribe()
+    // Likes
+    const likesChannel = supabase.channel('likes').on('postgres_changes', { event: '*', schema: 'public', table: 'likes' }, payload => {
+      const event = EVENT_MAP.likes[payload.eventType as 'INSERT' | 'DELETE']
+      if (event) emit(event, { postId: payload.new?.postId || payload.old?.postId, userId: payload.new?.userId || payload.old?.userId, action: payload.eventType === 'INSERT' ? 'like' : 'unlike' })
+    }).subscribe()
+    // Reposts
+    const repostsChannel = supabase.channel('reposts').on('postgres_changes', { event: '*', schema: 'public', table: 'reposts' }, payload => {
+      const event = EVENT_MAP.reposts[payload.eventType as 'INSERT' | 'DELETE']
+      if (event) emit(event, { postId: payload.new?.postId || payload.old?.postId, action: payload.eventType === 'INSERT' ? 'repost' : 'unrepost' })
+    }).subscribe()
+    // Views
+    const viewsChannel = supabase.channel('views').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'views' }, payload => {
+      emit('post:viewed', { postId: payload.new?.postId, userId: payload.new?.userId })
+    }).subscribe()
     return () => {
-      console.log("RealtimeProvider cleanup")
+      supabase.removeChannel(commentsChannel)
+      supabase.removeChannel(likesChannel)
+      supabase.removeChannel(repostsChannel)
+      supabase.removeChannel(viewsChannel)
     }
   }, [])
 
-  const sendMessage = (type: string, data: any) => {
-    // Simulate sending message
-    console.log("Sending message:", { type, data })
-    
-    // Simulate receiving the same message back (for testing)
-    const callbacks = subscribers.get(type)
-    if (callbacks) {
-      callbacks.forEach(callback => callback(data))
-    }
+  function emit(event: string, data: any) {
+    const set = listeners.current.get(event)
+    if (set) for (const cb of set) cb(data)
   }
 
-  const subscribe = (event: string, callback: (data: any) => void) => {
-    setSubscribers(prev => {
-      const newSubscribers = new Map(prev)
-      const callbacks = new Set(newSubscribers.get(event) || [])
-      callbacks.add(callback)
-      newSubscribers.set(event, callbacks)
-      return newSubscribers
-    })
-
-    // Return unsubscribe function
+  function subscribe(event: string, callback: (data: any) => void) {
+    if (!listeners.current.has(event)) listeners.current.set(event, new Set())
+    listeners.current.get(event)!.add(callback)
     return () => {
-      setSubscribers(prev => {
-        const newSubscribers = new Map(prev)
-        const callbacks = new Set(newSubscribers.get(event) || [])
-        callbacks.delete(callback)
-        if (callbacks.size === 0) {
-          newSubscribers.delete(event)
-        } else {
-          newSubscribers.set(event, callbacks)
-        }
-        return newSubscribers
-      })
+      listeners.current.get(event)?.delete(callback)
     }
   }
 
   const value: RealtimeContextType = {
     isConnected,
-    sendMessage,
+    sendMessage: () => {},
     subscribe,
   }
-
   return (
     <RealtimeContext.Provider value={value}>
       {children}

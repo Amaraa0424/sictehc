@@ -49,6 +49,15 @@ export default function SessionProvider({ children }: SessionProviderProps) {
     checkSession()
   }, [])
 
+  // Set userId in localStorage for realtime notifications
+  useEffect(() => {
+    if (user?.id) {
+      localStorage.setItem("userId", user.id)
+    } else {
+      localStorage.removeItem("userId")
+    }
+  }, [user])
+
   const checkSession = async () => {
     try {
       setLoading(true)

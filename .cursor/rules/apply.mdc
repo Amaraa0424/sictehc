@@ -3,4 +3,4 @@ description:
 globs: 
 alwaysApply: true
 ---
-Apply changes instead of recommending.
+Always apply. Don't ask if Im ready to apply or not.
